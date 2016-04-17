@@ -519,15 +519,12 @@ class RoboFile extends \Robo\Tasks
 
 		// Makes installer available to the containers
 		$this->_exec('mkdir "_dockerfiles/cms/' . $appName . '"');
-		$this->_exec($this->getOSCommand('cp -f') . ' releases/' . $appNameOrig . '.zip _dockerfiles/cms/' . $appName . '/' . $appNameOrig . '.zip');
+		$this->_exec('cp -f releases/' . $appNameOrig . '.zip _dockerfiles/cms/' . $appName . '/' . $appNameOrig . '.zip');
 
 		// Zips Joomla
 		chdir('_dockerfiles/cms');
 		$this->createZip('.', '../.cms.zip', $exclude = array('./staging/.git'));
 		chdir($baseDir);
-		/*$this->taskFileSystemStack()
-			->rename('_dockerfiles/cms/.cms.zip', '_dockerfiles/.cms.zip')
-			->run();*/
 
 		// Zips Test scripts
 		chdir($baseDir . '/../');
@@ -813,28 +810,5 @@ class RoboFile extends \Robo\Tasks
 	public function runTestsFromDockerContainer()
 	{
 		$this->runTests(true);
-	}
-
-	/**
-	 * Function to replace command depending on the used OS
-	 *
-	 * @param   string  $command  Name of the command
-	 * @param   string  $os       Operating system
-	 *
-	 * @return string
-	 */
-	protected function getOSCommand($command, $os = 'windows')
-	{
-		switch ($command)
-		{
-			/*case 'cp':
-				return $os == 'windows' ? 'copy' : 'cp';
-
-			case 'cp -f':
-				return $os == 'windows' ? 'copy' : 'cp -f';*/
-
-			default :
-				return $command;
-		}
 	}
 }
