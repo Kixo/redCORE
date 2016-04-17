@@ -499,7 +499,7 @@ class RoboFile extends \Robo\Tasks
 		// Tries to delete the _dockerfiles working folder if it exists, and re-creates it
 		try
 		{
-			$this->_deleteDir('_dockerfiles');
+			$this->_exec('rm -r "_dockerfiles"');
 		}
 		catch (Exception $e)
 		{
@@ -518,20 +518,20 @@ class RoboFile extends \Robo\Tasks
 		}
 
 		// Makes installer available to the containers
-		$this->_exec('mkdir _dockerfiles/cms/' . $appName);
-		$this->_exec('cp -f releases/' . $appNameOrig . '.zip _dockerfiles/cms/' . $appName);
+		$this->_exec('mkdir "_dockerfiles/cms/' . $appName . '"');
+		$this->_exec($this->getOSCommand('cp -f') . ' releases/' . $appNameOrig . '.zip _dockerfiles/cms/' . $appName . '/' . $appNameOrig . '.zip');
 
 		// Zips Joomla
 		chdir('_dockerfiles/cms');
-		$this->_exec('zip -q -r .cms.zip . -x *.git/*');
+		$this->createZip('.', '../.cms.zip', $exclude = array('./staging/.git'));
 		chdir($baseDir);
-		$this->taskFileSystemStack()
+		/*$this->taskFileSystemStack()
 			->rename('_dockerfiles/cms/.cms.zip', '_dockerfiles/.cms.zip')
-			->run();
+			->run();*/
 
 		// Zips Test scripts
 		chdir($baseDir . '/../');
-		$this->_exec('zip --symlinks -q -r tests/_dockerfiles/.tests.zip tests -x tests/_dockerfiles/**\*');
+		$this->createZip('tests', 'tests/_dockerfiles/.tests.zip', $exclude = array('tests/_dockerfiles'));
 
 		// Going back to tests directory
 		chdir($baseDir);
@@ -576,7 +576,7 @@ class RoboFile extends \Robo\Tasks
 			$this->replaceVariablesInFile('_dockerfiles/php/' . $phpVersion . '/Dockerfile', $dockerVariables, $dockerValues);
 
 			// Unzips Joomla installs to make them available to the containers
-			$this->_exec('unzip -q _dockerfiles/.cms.zip -d _dockerfiles/php/' . $phpVersion . '/joomla');
+			$this->extractZip('_dockerfiles/.cms.zip', '_dockerfiles/php/' . $phpVersion . '/joomla');
 
 			// Tries to stop the container in case one with the same name already exists
 			try
@@ -639,7 +639,7 @@ class RoboFile extends \Robo\Tasks
 				);
 
 				// Unzips app tests files/folders in the container files
-				$this->_exec('unzip -q _dockerfiles/.tests.zip -d _dockerfiles/client/' . $phpVersion . '/' . $joomlaVersion . '/' . $appName);
+				$this->extractZip('_dockerfiles/.tests.zip', '_dockerfiles/client/' . $phpVersion . '/' . $joomlaVersion . '/' . $appName);
 
 				// Codeception configuration files with variable replacement
 				$this->taskFileSystemStack()
@@ -696,6 +696,93 @@ class RoboFile extends \Robo\Tasks
 	}
 
 	/**
+	 * Function to extract zip file to a specific location
+	 *
+	 * @param   string  $source  Name of the file (path)
+	 * @param   string  $path    Extract to
+	 *
+	 * @return bool
+	 */
+	protected function extractZip($source, $path)
+	{
+		$zip = new ZipArchive;
+		$resource = $zip->open($source);
+
+		if ($resource === true)
+		{
+			$zip->extractTo($path);
+			$zip->close();
+
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Function to extract zip file to a specific location
+	 *
+	 * @param   string  $source   Name of the folder (path)
+	 * @param   string  $path     Compress to file
+	 * @param   array   $exclude  Zip folder or file exclusion
+	 *
+	 * @return bool
+	 */
+	protected function createZip($source, $path, $exclude = array())
+	{
+		$zip = new ZipArchive;
+		$resource = $zip->open($path, ZIPARCHIVE::CREATE | ZipArchive::OVERWRITE);
+
+		if ($resource === true)
+		{
+			$this->addZipFiles(
+				$zip,
+				$source, // The path to the folder you wish to archive
+				$exclude, // Exclude any folder or file
+				strlen($source) + 1 // The string length of the base folder
+			);
+
+			$zip->close();
+
+			$this->say('Created zip to path: ' . realpath($path));
+
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Function to add zip files to a specific location
+	 *
+	 * @param   ZipArchive  &$zip     Zip Archive
+	 * @param   string      $dir      Directory to check
+	 * @param   array       $exclude  Exclude files or folders
+	 * @param   int         $base     Base length
+	 *
+	 * @return void
+	 */
+	protected function addZipFiles(&$zip, $dir, $exclude = array(), $base = 0)
+	{
+		foreach (glob($dir . '/*') as $file)
+		{
+			if (in_array($file, $exclude))
+			{
+				continue;
+			}
+
+			if (is_dir($file))
+			{
+				$this->addZipFiles($zip, $file, $exclude, $base);
+			}
+			else
+			{
+				$zip->addFile($file, substr($file, $base));
+			}
+		}
+	}
+
+	/**
 	 * Function to replace Docker variables in a given file
 	 *
 	 * @param   string  $fileName   Name of the file (path)
@@ -726,5 +813,28 @@ class RoboFile extends \Robo\Tasks
 	public function runTestsFromDockerContainer()
 	{
 		$this->runTests(true);
+	}
+
+	/**
+	 * Function to replace command depending on the used OS
+	 *
+	 * @param   string  $command  Name of the command
+	 * @param   string  $os       Operating system
+	 *
+	 * @return string
+	 */
+	protected function getOSCommand($command, $os = 'windows')
+	{
+		switch ($command)
+		{
+			/*case 'cp':
+				return $os == 'windows' ? 'copy' : 'cp';
+
+			case 'cp -f':
+				return $os == 'windows' ? 'copy' : 'cp -f';*/
+
+			default :
+				return $command;
+		}
 	}
 }
