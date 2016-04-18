@@ -530,10 +530,7 @@ class RoboFile extends \Robo\Tasks
 		}
 		else
 		{
-			$this->_exec('zip -q -r .cms.zip . -x *.git/*');
-			$this->taskFileSystemStack()
-				->rename('_dockerfiles/cms/.cms.zip', '_dockerfiles/.cms.zip')
-				->run();
+			$this->_exec('zip -q -r ../.cms.zip . -x *.git/*');
 		}
 
 		chdir($baseDir);
@@ -853,6 +850,6 @@ class RoboFile extends \Robo\Tasks
 	 */
 	public function isWin()
 	{
-		return (strtolower(substr(PHP_OS, 0, 3)) == 'win');
+		return (substr(PHP_OS, 0, 3) == 'win');
 	}
 }
