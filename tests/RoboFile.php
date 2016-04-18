@@ -523,12 +523,32 @@ class RoboFile extends \Robo\Tasks
 
 		// Zips Joomla
 		chdir('_dockerfiles/cms');
-		$this->createZip('.', '../.cms.zip', $exclude = array('./staging/.git'));
+
+		if ($this->isWin())
+		{
+			$this->createZip('.', '../.cms.zip', $exclude = array('./staging/.git'));
+		}
+		else
+		{
+			$this->_exec('zip -q -r .cms.zip . -x *.git/*');
+			$this->taskFileSystemStack()
+				->rename('_dockerfiles/cms/.cms.zip', '_dockerfiles/.cms.zip')
+				->run();
+		}
+
 		chdir($baseDir);
 
 		// Zips Test scripts
 		chdir($baseDir . '/../');
-		$this->createZip('tests', 'tests/_dockerfiles/.tests.zip', $exclude = array('tests/_dockerfiles'));
+
+		if ($this->isWin())
+		{
+			$this->createZip('tests', 'tests/_dockerfiles/.tests.zip', $exclude = array('tests/_dockerfiles'));
+		}
+		else
+		{
+			$this->_exec('zip --symlinks -q -r tests/_dockerfiles/.tests.zip tests -x tests/_dockerfiles/**\*');
+		}
 
 		// Going back to tests directory
 		chdir($baseDir);
@@ -573,7 +593,14 @@ class RoboFile extends \Robo\Tasks
 			$this->replaceVariablesInFile('_dockerfiles/php/' . $phpVersion . '/Dockerfile', $dockerVariables, $dockerValues);
 
 			// Unzips Joomla installs to make them available to the containers
-			$this->extractZip('_dockerfiles/.cms.zip', '_dockerfiles/php/' . $phpVersion . '/joomla');
+			if ($this->isWin())
+			{
+				$this->extractZip('_dockerfiles/.cms.zip', '_dockerfiles/php/' . $phpVersion . '/joomla');
+			}
+			else
+			{
+				$this->_exec('unzip -q _dockerfiles/.cms.zip -d _dockerfiles/php/' . $phpVersion . '/joomla');
+			}
 
 			// Tries to stop the container in case one with the same name already exists
 			try
@@ -636,7 +663,14 @@ class RoboFile extends \Robo\Tasks
 				);
 
 				// Unzips app tests files/folders in the container files
-				$this->extractZip('_dockerfiles/.tests.zip', '_dockerfiles/client/' . $phpVersion . '/' . $joomlaVersion . '/' . $appName);
+				if ($this->isWin())
+				{
+					$this->extractZip('_dockerfiles/.tests.zip', '_dockerfiles/client/' . $phpVersion . '/' . $joomlaVersion . '/' . $appName);
+				}
+				else
+				{
+					$this->_exec('unzip -q _dockerfiles/.tests.zip -d _dockerfiles/client/' . $phpVersion . '/' . $joomlaVersion . '/' . $appName);
+				}
 
 				// Codeception configuration files with variable replacement
 				$this->taskFileSystemStack()
@@ -810,5 +844,15 @@ class RoboFile extends \Robo\Tasks
 	public function runTestsFromDockerContainer()
 	{
 		$this->runTests(true);
+	}
+
+	/**
+	 * Function check if current system is windows
+	 *
+	 * @return bool
+	 */
+	public function isWin()
+	{
+		return (strtolower(substr(PHP_OS, 0, 3)) == 'win');
 	}
 }
